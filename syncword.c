@@ -2,59 +2,52 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 #include "syncword.h"
 
 typedef struct {
-    bool*   bits;
-    size_t  bit_len;
+    uint8_t*    bytes;
+    size_t      byte_len;
 } SyncWord;
 
-int hamming_distance(bool* syncword, bool* window_bits, size_t len) {
-    int dist = 0;
-    for (int i = 0; i < len; i++) {
-        dist += (syncword[i] != window_bits[i]);
+size_t count_ones_in_byte(uint8_t byte) {
+    size_t count = 0;
+    while (byte) {
+        count += byte & 1;
+        byte >>= 1;
     }
-    return dist;
+    return count;
 }
 
-void byte_to_bits(uint8_t val, bool out[8], bool lsb_first) {
-    for(int i = 0; i < 8; i++) {
-        int bit = (val >> (lsb_first ? i : (7 - i))) & 1;
-        out[i] = bit;
-    }
-}
-
-SyncWord* syncword_create(uint8_t* bytes, size_t byte_count, bool lsb_first) {
+SyncWord* syncword_create(uint8_t* bytes, size_t byte_count) {
     SyncWord* sw = malloc(sizeof(SyncWord));
     if (!sw) return NULL;
 
-    sw->bit_len = byte_count * 8;
-    sw->bits = malloc(sw->bit_len * sizeof(bool));
-    if (!sw->bits) {
-        return NULL;
-    }
+    sw->bytes = malloc(byte_count);
+    if (!sw->bytes) {free (sw); return NULL;}
+    memcpy(sw->bytes, bytes, byte_count);
 
-    for (size_t b = 0; b < byte_count; b++) {
-        bool buf[8];
-        byte_to_bits(bytes[b], buf, lsb_first);
-
-        memcpy(sw->bits + (b * 8), buf, 8 * sizeof(bool));
-    }
+    sw->byte_len = byte_count;
+    sw->bytes = bytes;
 
     return sw;
 }
 
-int syncword_detect(bool* stream_bits, SyncWord* syncword, int max_errors, int size_stream_bits) {
-    if (syncword->bit_len > size_stream_bits) {
+int syncword_detect(SyncWord* syncword, int max_errors, int size_byte_stream, uint8_t* byte_stream) {
+    if (syncword->byte_len > size_byte_stream) {
         return -1;
     }
 
-    int last_index = size_stream_bits - syncword->bit_len;
+    int last_index = size_byte_stream - syncword->byte_len;
 
-    for (int i = 0; i <= last_index; i++) {
-        int dist = hamming_distance(syncword->bits, stream_bits + i, syncword->bit_len);
+    for (size_t i = 0; i <= last_index; i++) {
+        int dist = 0;
+        for (size_t j = 0; j < syncword->byte_len; j++) {
+            dist += count_ones_in_byte(syncword->bytes[j] ^ byte_stream[i+j]);
+        }
+
         if (dist <= max_errors) {
-            return (int)(i + syncword->bit_len);
+            return i + syncword->byte_len;
         }
     }
     return -1;
@@ -62,11 +55,7 @@ int syncword_detect(bool* stream_bits, SyncWord* syncword, int max_errors, int s
 
 void syncword_destroy(SyncWord* sw) {
     if (!sw) return;
-    free(sw->bits);
+    free(sw->bytes);
     free(sw);
 }
 
-
-int main() {
-    return 0;
-}

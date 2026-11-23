@@ -5,11 +5,6 @@
 #include <string.h>
 #include "syncword.h"
 
-typedef struct {
-    uint8_t*    bytes;
-    size_t      byte_len;
-} SyncWord;
-
 size_t count_ones_in_byte(uint8_t byte) {
     size_t count = 0;
     while (byte) {
@@ -28,12 +23,11 @@ SyncWord* syncword_create(uint8_t* bytes, size_t byte_count) {
     memcpy(sw->bytes, bytes, byte_count);
 
     sw->byte_len = byte_count;
-    sw->bytes = bytes;
 
     return sw;
 }
 
-int syncword_detect(SyncWord* syncword, int max_errors, int size_byte_stream, uint8_t* byte_stream) {
+int syncword_detect(SyncWord* syncword, size_t max_errors, size_t size_byte_stream, uint8_t* byte_stream) {
     if (syncword->byte_len > size_byte_stream) {
         return -1;
     }

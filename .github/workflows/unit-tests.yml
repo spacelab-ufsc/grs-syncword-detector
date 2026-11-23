@@ -1,0 +1,44 @@
+name: Unit tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install CMocka
+        run: sudo apt-get update && sudo apt-get install -y libcmocka-dev
+
+      - name: Build the tests
+        run: make -C tests all
+
+      - name: Run the tests
+        run: ./tests/syncword_unit_test
+
+  static-analysis:
+    name: Static analysis
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install CppCheck
+        run: sudo apt-get update && sudo apt-get install -y cppcheck
+
+      - name: Run CppCheck
+        run: cppcheck --std=c99 --enable=warning,style --error-exitcode=1 syncword.c
